@@ -10,9 +10,13 @@ import random
 import string
 import sqlite3
 
-mapping_table = pd.DataFrame({"Product":["Prod1","Prod1","Prod1","Prod2","Prod2","Prod3","Prod3"], 
-                        "Part":["Part1","Part2","Part3","Part1","Part2","Part1","Part3"], 
-                        "Quantity":[5,4,2,2,3,3,1]})
+# mapping_table = pd.DataFrame({"Product":["Prod1","Prod1","Prod1","Prod2","Prod2","Prod3","Prod3"], 
+#                         "Part":["Part1","Part2","Part3","Part1","Part2","Part1","Part3"], 
+#                         "Quantity":[5,4,2,2,3,3,1]})
+
+# mapping_table = pd.DataFrame({"Product":[], 
+#                         "Part":[], 
+#                         "Quantity":[]})
 
 
 if 'sidebar_state' not in st.session_state:
@@ -76,6 +80,12 @@ if 'clrbillclicked' not in st.session_state:
 def clrbillclicked1():
     st.session_state.clrbillclicked = True
 
+if 'clrmapclicked' not in st.session_state:
+    st.session_state.clrmapclicked = False
+
+def clrmapclicked1():
+    st.session_state.clrmapclicked = True
+
 if 'chckinvclicked' not in st.session_state:
     st.session_state.chckinvclicked = False
 
@@ -88,6 +98,12 @@ if 'chckbillclicked' not in st.session_state:
 def chckbillclicked1():
     st.session_state.chckbillclicked = True
 
+if 'chckmapclicked' not in st.session_state:
+    st.session_state.chckmapclicked = False
+
+def chckmapclicked1():
+    st.session_state.chckmapclicked = True
+
 def main():
     st.title("Inventory Management System")
 
@@ -99,7 +115,7 @@ def main():
 
     clear_inventory = st.sidebar.button("Clear Inventory", on_click=clrinvclicked1)
     clear_billing = st.sidebar.button("Clear Billing", on_click=clrbillclicked1)
-
+    clear_mapping = st.sidebar.button("Clear Mapping", on_click=clrmapclicked1)
 
     if st.session_state.loginclicked:
             # if username <> "":
@@ -117,12 +133,12 @@ def main():
             cmd3 = "CREATE TABLE IF NOT EXISTS mapping_{user}(product TEXT, part TEXT, quantity INTEGER)".format(user=username)
             cursor.execute(cmd3)
 
-            cursor.execute("select count(1) from mapping_{user}".format(user=username))
-            res = cursor.fetchall()
-            if res[0][0] < 1:
-                for i in range(mapping_table.shape[0]):
-                    cursor.execute('INSERT INTO mapping_{user} VALUES("{prd}","{prt}",{q})'.format(user=username,prd=mapping_table['Product'][i],prt=mapping_table['Part'][i],q=mapping_table['Quantity'][i]))
-                conn.commit()
+            # cursor.execute("select count(1) from mapping_{user}".format(user=username))
+            # res = cursor.fetchall()
+            # if res[0][0] < 1:
+            #     for i in range(mapping_table.shape[0]):
+            #         cursor.execute('INSERT INTO mapping_{user} VALUES("{prd}","{prt}",{q})'.format(user=username,prd=mapping_table['Product'][i],prt=mapping_table['Part'][i],q=mapping_table['Quantity'][i]))
+            #     conn.commit()
 
             # Function to add inventory input
             def add_inventory(invoice_no, parts, quantity, purchase_date, uploaded_file, username):
@@ -165,6 +181,27 @@ def main():
                 cursor.execute("select * from billing_{user}".format(user=username))
                 res = cursor.fetchall()
                 st.table(pd.DataFrame(res, columns=["invoice_no", "product", "quantity", "bill_date"]))
+
+            def add_mapping(product, part, quantity, uploaded_file, username):
+                now = datetime.now()
+                current_date = now.strftime("%Y-%m-%d %H:%M:%S")
+                
+                if uploaded_file is not None:
+                    upload_df = pd.read_csv(uploaded_file)
+                    upload_df = upload_df[["Product", "Part", "Quantity"]]
+                    # st.write(upload_df)
+
+                    for i in range(upload_df.shape[0]):
+                        cursor.execute('INSERT INTO mapping_{user} VALUES("{prd}","{prt}",{q})'.format(user=username,prd=upload_df['Product'][i],prt=upload_df['Part'][i],q=upload_df['Quantity'][i]))
+                    conn.commit()
+                else:
+                    cursor.execute('INSERT INTO mapping_{user} VALUES("{prd}","{prt}",{q})'.format(user=username,prd=product,prt=part,q=quantity))
+                    conn.commit()
+
+                cursor.execute("select * from mapping_{user}".format(user=username))
+                res = cursor.fetchall()
+                mapping_table = pd.DataFrame(res, columns=["Product", "Part", "Quantity"])
+                st.table(mapping_table)
 
 
             st.session_state.sidebar_state = 'collapsed' if st.session_state.sidebar_state == 'expanded' else 'collapsed'
@@ -222,7 +259,10 @@ def main():
                 st.write("Please input billing details:")
 
                 invoice_no = st.text_input("Invoice Number ")
-                product = st.selectbox("Product",mapping_table['Product'].unique())
+                cursor.execute("select distinct product from mapping_{user}".format(user=username))
+                res = cursor.fetchall()
+                prod_tb = pd.DataFrame(res, columns=["Product"])
+                product = st.selectbox("Product",prod_tb['Product'].unique())
                 quantity = st.number_input("Quantity ", min_value=1, step=1)
                 bill_date = st.date_input("Bill Date")
 
@@ -233,15 +273,30 @@ def main():
                     st.success("Added to billing!")
 
             with tab6:
-                # st.table(pd.DataFrame({"Product":"Prod1", "Part":"Part1", "Quantity":5},
-                #                         {"Product":"Prod1", "Part":"Part2", "Quantity":4},
-                #                         {"Product":"Prod1", "Part":"Part3", "Quantity":2},
-                #                         {"Product":"Prod2", "Part":"Part1", "Quantity":2},
-                #                         {"Product":"Prod2", "Part":"Part2", "Quantity":3},
-                #                         {"Product":"Prod3", "Part":"Part1", "Quantity":3},
-                #                         {"Product":"Prod3", "Part":"Part3", "Quantity":1}
-                #                         ))
-                st.table(mapping_table)
+                check_mapping = st.button("Show me Product Mapping", on_click=chckmapclicked1)
+                if st.session_state.chckmapclicked:
+                    # cursor.execute("select * from billing_{user}".format(user=username))
+                    cursor.execute("select * from mapping_{user}".format(user=username))
+                    res1 = cursor.fetchall()
+                    st.table(pd.DataFrame(res1,columns=["Product", "Part", "Quantity"]))
+                    st.session_state.chckmapclicked = False
+
+                st.write("Please input product mapping with parts:")
+
+                cols=st.columns(3)
+                with cols[0]:
+                    pr = st.text_input('Product ')
+                with cols[1]:
+                    pt = st.text_input('Part')
+                with cols[2]:
+                    qt = st.text_input('Quantity')
+
+                # uploaded_file = st.file_uploader("Upload csv file ", type='csv')
+
+                if st.button("Add to Mapping"):
+                    add_mapping(pr, pt, qt, uploaded_file, username)
+                    st.success("Added to mapping!")
+                # st.table(mapping_table)
 
             if st.session_state.clrinvclicked:
                 cursor.execute("delete from inventory_{user}".format(user=username))
@@ -253,6 +308,10 @@ def main():
                 conn.commit()
                 st.session_state.clrbillclicked = False
 
+            if st.session_state.clrmapclicked:
+                cursor.execute("delete from mapping_{user}".format(user=username))
+                conn.commit()
+                st.session_state.clrmapclicked = False
 
 
         if (username in ("")):
