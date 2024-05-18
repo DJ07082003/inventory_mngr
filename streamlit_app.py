@@ -107,6 +107,12 @@ if 'clrmapclicked' not in st.session_state:
 def clrmapclicked1():
     st.session_state.clrmapclicked = True
 
+if 'clrmenuclicked' not in st.session_state:
+    st.session_state.clrmenuclicked = False
+
+def clrmenuclicked1():
+    st.session_state.clrmenuclicked = True
+
 if 'chckinvclicked' not in st.session_state:
     st.session_state.chckinvclicked = False
 
@@ -125,11 +131,18 @@ if 'chckmapclicked' not in st.session_state:
 def chckmapclicked1():
     st.session_state.chckmapclicked = True
 
+if 'chckmenuclicked' not in st.session_state:
+    st.session_state.chckmenuclicked = False
+
+def chckmenuclicked1():
+    st.session_state.chckmenuclicked = True    
+
 def main():
     # st.title("Inventory Management System")
     clear_inventory = st.sidebar.button("Clear Inventory", on_click=clrinvclicked1)
     clear_billing = st.sidebar.button("Clear Billing", on_click=clrbillclicked1)
     clear_mapping = st.sidebar.button("Clear Mapping", on_click=clrmapclicked1)
+    clear_menu = st.sidebar.button("Clear Menu", on_click=clrmenuclicked1)
 
     conn = sqlite3.connect("inventory_{user}.db".format(user=username))
     cursor = conn.cursor()
@@ -142,6 +155,9 @@ def main():
 
     cmd3 = "CREATE TABLE IF NOT EXISTS mapping_{user}(product TEXT, part TEXT, quantity INTEGER)".format(user=username)
     cursor.execute(cmd3)
+
+    cmd4 = "CREATE TABLE IF NOT EXISTS menu_{user}(restaurant TEXT, item TEXT, price FLOAT)".format(user=username)
+    cursor.execute(cmd4)
 
     # cursor.execute("select count(1) from mapping_{user}".format(user=username))
     # res = cursor.fetchall()
@@ -213,12 +229,54 @@ def main():
         mapping_table = pd.DataFrame(res, columns=["Product", "Part", "Quantity"])
         st.table(mapping_table)
 
+    def add_menu(rst, itm, prc, uploaded_file, username):
+        now = datetime.now()
+        current_date = now.strftime("%Y-%m-%d %H:%M:%S")
+        
+        if uploaded_file is not None:
+            upload_df = pd.read_csv(uploaded_file)
+            upload_df = upload_df[["Restaurant", "Item", "Price"]]
+            # st.write(upload_df)
+
+            for i in range(upload_df.shape[0]):
+                cursor.execute('INSERT INTO menu_{user} VALUES("{rst}","{itm}",{prc})'.format(user=username,rst=upload_df['Restaurant'][i],itm=upload_df['Item'][i],prc=upload_df['Price'][i]))
+            conn.commit()
+        else:
+            cursor.execute('INSERT INTO menu_{user} VALUES("{rst}","{itm}",{prc})'.format(user=username,rst=rst,itm=itm,prc=prc))
+            conn.commit()
+
+        cursor.execute("select * from menu_{user}".format(user=username))
+        res = cursor.fetchall()
+        menu_table = pd.DataFrame(res, columns=["Restaurant", "Item", "Price"])
+        st.table(menu_table)
+
+    def update_menu(rst, itm, prc, uploaded_file, username):
+        now = datetime.now()
+        current_date = now.strftime("%Y-%m-%d %H:%M:%S")
+        
+        if uploaded_file is not None:
+            upload_df = pd.read_csv(uploaded_file)
+            upload_df = upload_df[["Restaurant", "Item", "Price"]]
+            # st.write(upload_df)
+
+            for i in range(upload_df.shape[0]):
+                cursor.execute('UPDATE menu_{user} SET price = {prc} WHERE restaurant = "{rst}" and item = "{itm}" '.format(user=username,rst=upload_df['Restaurant'][i],itm=upload_df['Item'][i],prc=upload_df['Price'][i]))
+            conn.commit()
+        else:
+            cursor.execute('UPDATE menu_{user} SET price = {prc} WHERE restaurant = "{rst}" and item = "{itm}" '.format(user=username,rst=rst,itm=itm,prc=prc))
+            conn.commit()
+
+        cursor.execute("select * from menu_{user}".format(user=username))
+        res = cursor.fetchall()
+        menu_table = pd.DataFrame(res, columns=["Restaurant", "Item", "Price"])
+        st.table(menu_table)
+
 
     st.session_state.sidebar_state = 'collapsed' if st.session_state.sidebar_state == 'expanded' else 'collapsed'
     st.sidebar.success("Logged in as {}".format(username))
     # st.sidebar.write("Registration page coming soon...")
     st.write("Welcome, {}".format(name))
-    tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Overview","Inventory","Orders","Analysis","Reports","Billing","Mapping"])
+    tab0, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Overview","Inventory","Orders","Analysis","Reports","Billing","Mapping","Menu Settings"])
 
     with tab1:
         check_inventory = st.button("Check Inventory", on_click=chckinvclicked1)
@@ -309,6 +367,54 @@ def main():
             st.success("Added to mapping!")
         # st.table(mapping_table)
 
+    with tab7:
+        check_menu = st.button("Show me Menu", on_click=chckmenuclicked1)
+        s = f"<p style='font-size:20px;'>What do you want to do?</p>"
+        st.markdown(s, unsafe_allow_html=True)
+        add_update = st.radio("", ["Add new items in the menu","Update existing items price"])
+
+        if st.session_state.chckmenuclicked:
+            # cursor.execute("select * from billing_{user}".format(user=username))
+            cursor.execute("select * from menu_{user}".format(user=username))
+            res1 = cursor.fetchall()
+            st.table(pd.DataFrame(res1,columns=["Restaurant", "Item", "Price"]))
+            st.session_state.chckmenuclicked = False
+
+        st.write("Please input menu details:")
+
+        cols=st.columns(3)
+        with cols[0]:
+            rst = st.selectbox("Restaurant",['R'+str(i+1) for i in range(25)])
+            # rst = st.text_input('Restaurant')
+        with cols[1]:
+            if add_update == "Update existing items price":
+                cursor.execute("select distinct item from menu_{user} where restaurant = '{rst}' ".format(user=username, rst=rst))
+                res = cursor.fetchall()
+                itm_tb = pd.DataFrame(res, columns=["item"])
+                if len(itm_tb) < 1:
+                    st.write('There is no item in this selection.') 
+                    st.write('Please add some items.')
+                else:
+                    itm = st.selectbox("Item",itm_tb['item'].unique())
+            if add_update == "Add new items in the menu":
+                itm = st.text_input("Item")
+        with cols[2]:
+            # prc = st.text_input('Price')
+            prc = st.number_input('Price')
+
+        # uploaded_file = st.file_uploader("Upload csv file ", type='csv')
+
+
+        if add_update == "Add new items in the menu":
+            if st.button("Add to Menu"):
+                add_menu(rst, itm, prc, uploaded_file, username)
+                st.success("Added to menu!")
+        if add_update == "Update existing items price":
+            if st.button("Update in the Menu"):
+                update_menu(rst, itm, prc, uploaded_file, username)
+                st.success("Updated in the menu!")
+        # st.table(mapping_table)
+
     if st.session_state.clrinvclicked:
         cursor.execute("delete from inventory_{user}".format(user=username))
         conn.commit()
@@ -324,6 +430,10 @@ def main():
         conn.commit()
         st.session_state.clrmapclicked = False
 
+    if st.session_state.clrmenuclicked:
+        cursor.execute("delete from menu_{user}".format(user=username))
+        conn.commit()
+        st.session_state.clrmenuclicked = False
 
 
 ## Login authentication
