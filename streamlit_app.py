@@ -229,7 +229,34 @@ def main():
         mapping_table = pd.DataFrame(res, columns=["Product", "Part", "Quantity"])
         st.table(mapping_table)
 
-    def add_menu(rst, itm, prc, uploaded_file, username):
+    def add_menu(rst, itm, prc, uploaded_file, username, rst1):
+        now = datetime.now()
+        current_date = now.strftime("%Y-%m-%d %H:%M:%S")
+
+        if uploaded_file is not None:
+            upload_df = pd.read_csv(uploaded_file)
+            upload_df = upload_df[["Restaurant", "Item", "Price"]]
+            # st.write(upload_df)
+
+            for i in range(upload_df.shape[0]):
+                cursor.execute('INSERT INTO menu_{user} VALUES("{rst11}","{itm}",{prc})'.format(user=username,rst11=upload_df['Restaurant'][i],itm=upload_df['Item'][i],prc=upload_df['Price'][i]))
+            conn.commit()
+        else:
+            if rst1 == "Selected":
+                for i in rst:
+                    cursor.execute('INSERT INTO menu_{user} VALUES("{rst11}","{itm}",{prc})'.format(user=username,rst11=i,itm=itm,prc=prc))
+                    conn.commit()
+            if rst1 == "All":
+                for i in ['R'+str(i+1) for i in range(25)]:
+                    cursor.execute('INSERT INTO menu_{user} VALUES("{rst11}","{itm}",{prc})'.format(user=username,rst11=i,itm=itm,prc=prc))
+                    conn.commit()
+        
+        cursor.execute("select * from menu_{user}".format(user=username))
+        res = cursor.fetchall()
+        menu_table = pd.DataFrame(res, columns=["Restaurant", "Item", "Price"])
+        st.table(menu_table)
+
+    def update_menu(rst, itm, prc, uploaded_file, username, rst1):
         now = datetime.now()
         current_date = now.strftime("%Y-%m-%d %H:%M:%S")
         
@@ -239,18 +266,24 @@ def main():
             # st.write(upload_df)
 
             for i in range(upload_df.shape[0]):
-                cursor.execute('INSERT INTO menu_{user} VALUES("{rst}","{itm}",{prc})'.format(user=username,rst=upload_df['Restaurant'][i],itm=upload_df['Item'][i],prc=upload_df['Price'][i]))
+                cursor.execute('UPDATE menu_{user} SET price = {prc} WHERE restaurant = "{rst11}" and item = "{itm}" '.format(user=username,rst11=upload_df['Restaurant'][i],itm=upload_df['Item'][i],prc=upload_df['Price'][i]))
             conn.commit()
         else:
-            cursor.execute('INSERT INTO menu_{user} VALUES("{rst}","{itm}",{prc})'.format(user=username,rst=rst,itm=itm,prc=prc))
-            conn.commit()
+            if rst1 == "Selected":
+                for i in rst:
+                    cursor.execute('UPDATE menu_{user} SET price = {prc} WHERE restaurant = "{rst11}" and item = "{itm}" '.format(user=username,rst11=i,itm=itm,prc=prc))
+                    conn.commit()
+            if rst1 == "All":
+                for i in ['R'+str(i+1) for i in range(25)]:
+                    cursor.execute('UPDATE menu_{user} SET price = {prc} WHERE restaurant = "{rst11}" and item = "{itm}" '.format(user=username,rst11=i,itm=itm,prc=prc))
+                    conn.commit()
 
         cursor.execute("select * from menu_{user}".format(user=username))
         res = cursor.fetchall()
         menu_table = pd.DataFrame(res, columns=["Restaurant", "Item", "Price"])
         st.table(menu_table)
 
-    def update_menu(rst, itm, prc, uploaded_file, username):
+    def update_menu_item(rst, itm, itm_new, uploaded_file, username, rst1):
         now = datetime.now()
         current_date = now.strftime("%Y-%m-%d %H:%M:%S")
         
@@ -260,16 +293,18 @@ def main():
             # st.write(upload_df)
 
             for i in range(upload_df.shape[0]):
-                cursor.execute('UPDATE menu_{user} SET price = {prc} WHERE restaurant = "{rst}" and item = "{itm}" '.format(user=username,rst=upload_df['Restaurant'][i],itm=upload_df['Item'][i],prc=upload_df['Price'][i]))
+                cursor.execute('UPDATE menu_{user} SET item = "{itm_new}" WHERE restaurant = "{rst11}" and item = "{itm}" '.format(user=username,rst11=upload_df['Restaurant'][i],itm=upload_df['Item'][i],itm_new=upload_df['itm_new'][i]))
             conn.commit()
         else:
-            cursor.execute('UPDATE menu_{user} SET price = {prc} WHERE restaurant = "{rst}" and item = "{itm}" '.format(user=username,rst=rst,itm=itm,prc=prc))
-            conn.commit()
+            if rst1 == "Selected":
+                for i in rst:
+                    cursor.execute('UPDATE menu_{user} SET item = "{itm_new}" WHERE restaurant = "{rst11}" and item = "{itm}" '.format(user=username,rst11=i,itm=itm,itm_new=itm_new))
+                    conn.commit()
+            if rst1 == "All":
+                for i in ['R'+str(i+1) for i in range(25)]:
+                    cursor.execute('UPDATE menu_{user} SET item = "{itm_new}" WHERE restaurant = "{rst11}" and item = "{itm}" '.format(user=username,rst11=i,itm=itm,itm_new=itm_new))
+                    conn.commit()
 
-        cursor.execute("select * from menu_{user}".format(user=username))
-        res = cursor.fetchall()
-        menu_table = pd.DataFrame(res, columns=["Restaurant", "Item", "Price"])
-        st.table(menu_table)
 
 
     st.session_state.sidebar_state = 'collapsed' if st.session_state.sidebar_state == 'expanded' else 'collapsed'
@@ -369,51 +404,100 @@ def main():
 
     with tab7:
         check_menu = st.button("Show me Menu", on_click=chckmenuclicked1)
-        s = f"<p style='font-size:20px;'>What do you want to do?</p>"
-        st.markdown(s, unsafe_allow_html=True)
-        add_update = st.radio("", ["Add new items in the menu","Update existing items price"])
 
         if st.session_state.chckmenuclicked:
             # cursor.execute("select * from billing_{user}".format(user=username))
             cursor.execute("select * from menu_{user}".format(user=username))
             res1 = cursor.fetchall()
-            st.table(pd.DataFrame(res1,columns=["Restaurant", "Item", "Price"]))
+            st.dataframe(pd.DataFrame(res1,columns=["Restaurant", "Item", "Price"]))
             st.session_state.chckmenuclicked = False
-
-        st.write("Please input menu details:")
-
-        cols=st.columns(3)
-        with cols[0]:
-            rst = st.selectbox("Restaurant",['R'+str(i+1) for i in range(25)])
-            # rst = st.text_input('Restaurant')
-        with cols[1]:
-            if add_update == "Update existing items price":
-                cursor.execute("select distinct item from menu_{user} where restaurant = '{rst}' ".format(user=username, rst=rst))
-                res = cursor.fetchall()
-                itm_tb = pd.DataFrame(res, columns=["item"])
-                if len(itm_tb) < 1:
-                    st.write('There is no item in this selection.') 
-                    st.write('Please add some items.')
-                else:
-                    itm = st.selectbox("Item",itm_tb['item'].unique())
-            if add_update == "Add new items in the menu":
-                itm = st.text_input("Item")
-        with cols[2]:
-            # prc = st.text_input('Price')
-            prc = st.number_input('Price')
+        s = f"<p style='font-size:20px;'>What do you want to do?</p>"
+        st.markdown(s, unsafe_allow_html=True)
+        add_update = st.radio("select any one", ["Add new items in the menu","Update existing item price","Update existing item name"], label_visibility='hidden')
 
         # uploaded_file = st.file_uploader("Upload csv file ", type='csv')
 
-
         if add_update == "Add new items in the menu":
+            st.write("Please input required details:")
+
+            cols=st.columns(3)
+            with cols[0]:
+                itm = st.text_input("Please provide Item Name")
+            with cols[1]:
+                rst = st.multiselect("Pick all the restaurants to add new items into:",['R'+str(i+1) for i in range(25)])
+                rst1 = st.radio("Select this button to update same item in all outlets:",["Selected","All"])
+            with cols[2]:
+                prc = st.number_input('Please provide Item Price')
+
             if st.button("Add to Menu"):
-                add_menu(rst, itm, prc, uploaded_file, username)
+                add_menu(rst, itm, prc, uploaded_file, username, rst1)
                 st.success("Added to menu!")
-        if add_update == "Update existing items price":
-            if st.button("Update in the Menu"):
-                update_menu(rst, itm, prc, uploaded_file, username)
-                st.success("Updated in the menu!")
-        # st.table(mapping_table)
+        
+        if add_update == "Update existing item price":
+            cols=st.columns(3)
+            with cols[0]:
+                cursor.execute("select distinct item from menu_{user} ".format(user=username))
+                res = cursor.fetchall()
+                itm_tb = pd.DataFrame(res, columns=["item"])
+                itm = st.selectbox("Pick any Item Name from the list",itm_tb['item'].unique())
+                # if add_update == "Update existing item price":
+                #     cursor.execute("select distinct item from menu_{user} where restaurant = '{rst}' ".format(user=username, rst=rst))
+                #     res = cursor.fetchall()
+                #     itm_tb = pd.DataFrame(res, columns=["item"])
+                #     if len(itm_tb) < 1:
+                #         st.write('There is no item in this selection.') 
+                #         st.write('Please add some items.')
+                #     else:
+                #         itm = st.selectbox("Item",itm_tb['item'].unique())
+                # if add_update == "Add new items in the menu":
+                #     itm = st.text_input("Item")
+            with cols[1]:
+                cursor.execute("select distinct restaurant from menu_{user} where item ='{itm}' ".format(user=username, itm=itm))
+                res = cursor.fetchall()
+                rst_tb = pd.DataFrame(res, columns=["restaurant"])
+                rst = st.multiselect("Pick all the restaurants to update item prices into:",rst_tb['restaurant'].unique())
+                rst1 = st.radio("Select this button to update same price in all outlets:",["Selected","All"])
+            with cols[2]:
+                # prc = st.text_input('Price')
+                prc = st.number_input('Price')
+
+            if st.button("Update price in the Menu"):
+                update_menu(rst, itm, prc, uploaded_file, username, rst1)
+                st.success("Updated price in the menu!")
+
+        if add_update == "Update existing item name":
+            cols=st.columns(3)
+            with cols[0]:
+                cursor.execute("select distinct item from menu_{user} ".format(user=username))
+                res = cursor.fetchall()
+                itm_tb = pd.DataFrame(res, columns=["item"])
+                itm = st.selectbox("Pick any Item Name from the list",itm_tb['item'].unique())
+                # itm_new = st.text_input("Provide correct name here:")
+                # if add_update == "Update existing item price":
+                #     cursor.execute("select distinct item from menu_{user} where restaurant = '{rst}' ".format(user=username, rst=rst))
+                #     res = cursor.fetchall()
+                #     itm_tb = pd.DataFrame(res, columns=["item"])
+                #     if len(itm_tb) < 1:
+                #         st.write('There is no item in this selection.') 
+                #         st.write('Please add some items.')
+                #     else:
+                #         itm = st.selectbox("Item",itm_tb['item'].unique())
+                # if add_update == "Add new items in the menu":
+                #     itm = st.text_input("Item")
+            with cols[1]:
+                cursor.execute("select distinct restaurant from menu_{user} where item ='{itm}' ".format(user=username, itm=itm))
+                res = cursor.fetchall()
+                rst_tb = pd.DataFrame(res, columns=["restaurant"])
+                rst = st.multiselect("Pick all the restaurants to update item prices into:",rst_tb['restaurant'].unique())
+                rst1 = st.radio("Select this button to update same item name in all outlets:",["Selected","All"])
+            with cols[2]:
+                # prc = st.text_input('Price')
+                itm_new = st.text_input('Correct Item Name')
+
+            if st.button("Update item name in the Menu"):
+                update_menu_item(rst, itm, itm_new, uploaded_file, username, rst1)
+                st.success("Updated item name in the menu!")
+
 
     if st.session_state.clrinvclicked:
         cursor.execute("delete from inventory_{user}".format(user=username))
